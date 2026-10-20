@@ -15,12 +15,13 @@ echo "[info] Tomcat max threads=10，库存 delay≈2.5s → 预期 busy≈max�
 echo
 
 end_at=$((SECONDS + DURATION_SEC))
-ok=0
-fail=0
+stat_dir="${RUN_DIR}/load-stats.$$"
+mkdir -p "${stat_dir}"
 pids=()
 
 worker() {
   local id="$1"
+  local ok=0 fail=0
   while (( SECONDS < end_at )); do
     local code
     code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 15 \
@@ -31,6 +32,8 @@ worker() {
       fail=$((fail + 1))
     fi
   done
+  echo "${ok}" >"${stat_dir}/ok.${id}"
+  echo "${fail}" >"${stat_dir}/fail.${id}"
 }
 
 for ((i = 1; i <= CONCURRENCY; i++)); do
@@ -38,14 +41,15 @@ for ((i = 1; i <= CONCURRENCY; i++)); do
   pids+=($!)
 done
 
-# 压测期间打印一次 busy 线程指标（若可用）
+# 压测期间从管理端口抽样 busy（不占用业务线程池）
 sleep 3
-echo "--- 压测中抽样指标 ---"
-curl -fsS --max-time 2 "${ORDER_URL}/actuator/metrics/tomcat.threads.busy" 2>/dev/null \
-  | head -c 400 || echo "(metrics 暂不可用，可能已被打满阻塞)"
+echo "--- 压测中抽样指标（management :${MANAGEMENT_PORT}）---"
+curl -fsS --max-time 2 "${MGMT_URL}/actuator/metrics/tomcat.threads.busy" 2>/dev/null \
+  | tee "${EVIDENCE_DIR}/tomcat-threads-busy.json" | head -c 500 \
+  || echo "(busy metrics 暂不可用)"
 echo
-curl -fsS --max-time 2 "${ORDER_URL}/actuator/metrics/tomcat.threads.current" 2>/dev/null \
-  | head -c 400 || true
+curl -fsS --max-time 2 "${MGMT_URL}/actuator/metrics/tomcat.threads.current" 2>/dev/null \
+  | tee "${EVIDENCE_DIR}/tomcat-threads-current.json" | head -c 500 || true
 echo
 echo "--- 继续压测至结束 ---"
 
@@ -53,7 +57,19 @@ for pid in "${pids[@]}"; do
   wait "${pid}" || true
 done
 
+ok=0
+fail=0
+for f in "${stat_dir}"/ok.*; do
+  [[ -f "${f}" ]] || continue
+  ok=$((ok + $(cat "${f}")))
+done
+for f in "${stat_dir}"/fail.*; do
+  [[ -f "${f}" ]] || continue
+  fail=$((fail + $(cat "${f}")))
+done
+rm -rf "${stat_dir}"
+
 echo
-echo "[done] 压测结束 approx ok=${ok} fail_or_non200=${fail}"
+echo "[done] 压测结束 ok=${ok} fail_or_non200=${fail}"
 echo "下一步: ./scripts/jstack.sh   # 在压测进行中另开终端抓栈效果更好"
-echo "提示: 可先起压测再立刻 jstack；或再跑: CONCURRENCY=40 ./scripts/load.sh 40 40 &"
+

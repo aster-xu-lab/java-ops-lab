@@ -44,8 +44,9 @@ dump_once() {
       exit 1
       ;;
   esac
-  echo "[ok] wrote ${out}"
-  echo "${out}"
+  echo "[ok] wrote ${out}" >&2
+  # 仅把路径打到 stdout，供调用方收集
+  printf '%s\n' "${out}"
 }
 
 echo "[info] mode=${MODE} dumps=${COUNT} interval=${INTERVAL}s"
@@ -62,13 +63,15 @@ echo "======== 线程状态分布（对齐演练 Step 2）========"
 grep 'java.lang.Thread.State' "${files[@]}" | sort | uniq -c | sort -rn || true
 
 echo
-echo "======== http-nio exec 线程数量 ========"
-grep -E 'http-nio-.*-exec-' "${files[@]}" | grep '^"' | sort -u | wc -l || true
+echo "======== http-nio exec 线程名（去重）========"
+grep -E '^"http-nio-.*-exec-' "${files[@]}" | sort -u || true
 
 echo
 echo "======== 常见阻塞点关键词（节选）========"
-grep -E 'socketRead|HttpClient|RestTemplate|park|TIMED_WAITING|WAITING' "${files[0]}" | head -40 || true
+grep -E 'Net\.poll|socketRead|HttpClient|RestTemplate|NioSocketImpl|park' "${files[0]}" | head -50 || true
 
 echo
 echo "完整 dump 已写入 ${EVIDENCE_DIR}/"
-echo "可选 Actuator: curl -s ${ORDER_URL}/actuator/threaddump | head"
+echo "可选 Actuator: curl -s ${MGMT_URL}/actuator/threaddump | head"
+echo "busy 指标:     curl -s ${MGMT_URL}/actuator/metrics/tomcat.threads.busy"
+

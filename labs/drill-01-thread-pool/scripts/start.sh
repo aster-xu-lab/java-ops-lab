@@ -12,12 +12,12 @@ start_docker() {
   compose up -d --build
   echo docker >"$(mode_file)"
   wait_http "${INVENTORY_URL}/health" "inventory-mock" 90
-  wait_http "${ORDER_URL}/actuator/health" "order-query" 90
+  wait_http "${MGMT_URL}/actuator/health" "order-query-mgmt" 90
   echo
   echo "已启动（docker）："
   echo "  订单查询: ${ORDER_URL}/api/order/detail?orderId=ORD-1001"
   echo "  库存模拟: ${INVENTORY_URL}/health"
-  echo "  Actuator : ${ORDER_URL}/actuator/metrics/tomcat.threads.busy"
+  echo "  Actuator : ${MGMT_URL}/actuator/metrics/tomcat.threads.busy"
 }
 
 start_local() {
@@ -47,19 +47,21 @@ start_local() {
     >"${RUN_DIR}/inventory.log" 2>&1 &
   echo $! >"${RUN_DIR}/inventory.pid"
 
-  PORT="${ORDER_PORT}" INVENTORY_BASE_URL="http://127.0.0.1:${INVENTORY_PORT}" \
+  PORT="${ORDER_PORT}" MANAGEMENT_PORT="${MANAGEMENT_PORT}" \
+    INVENTORY_BASE_URL="http://127.0.0.1:${INVENTORY_PORT}" \
     java -jar "${ROOT_DIR}/order-query/target/order-query-1.0.0.jar" \
     >"${RUN_DIR}/order-query.log" 2>&1 &
   echo $! >"${RUN_DIR}/order-query.pid"
 
   echo local >"$(mode_file)"
   wait_http "${INVENTORY_URL}/health" "inventory-mock" 60
-  wait_http "${ORDER_URL}/actuator/health" "order-query" 90
+  wait_http "${MGMT_URL}/actuator/health" "order-query-mgmt" 90
   echo
   echo "已启动（local）："
   echo "  inventory pid=$(cat "${RUN_DIR}/inventory.pid")  log=${RUN_DIR}/inventory.log"
   echo "  order-query pid=$(cat "${RUN_DIR}/order-query.pid")  log=${RUN_DIR}/order-query.log"
   echo "  试调用: curl '${ORDER_URL}/api/order/detail?orderId=ORD-1001'"
+  echo "  指标:   curl '${MGMT_URL}/actuator/metrics/tomcat.threads.busy'"
 }
 
 case "${MODE}" in

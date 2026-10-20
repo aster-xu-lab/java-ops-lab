@@ -11,6 +11,7 @@
 | 组件 | 作用 |
 |------|------|
 | `order-query` (:8080) | Spring Boot + Tomcat，`server.tomcat.threads.max=10`，同步 HTTP 调库存 |
+| Actuator (:8082) | 独立管理端口，饱和时仍可看 `tomcat.threads.busy` |
 | `inventory-mock` (:8081) | JDK `HttpServer`，每个请求 `sleep ~2500ms` 再返回 |
 
 主线与演练一致：**慢下游占满工作线程 → 队列堆积 → 新请求变慢/超时**；CPU 不必很高。
@@ -66,21 +67,21 @@ docker compose down
 
 1. **接口变慢**：`/api/order/detail` 单次约 ≥2.5s（库存 sleep）；并发上来后排队，体感到秒级 P99。  
 2. **CPU 不必爆**：本机负载可中等，重点是阻塞而非算力。  
-3. **线程打满**：  
-   - `curl -s localhost:8080/actuator/metrics/tomcat.threads.busy` 中 `VALUE` 接近 **10**  
+3. **线程打满**（管理端口 **8082**，不占用业务线程池）：  
+   - `curl -s localhost:8082/actuator/metrics/tomcat.threads.busy` 中 `VALUE` 接近 **10**  
    - 同时 `tomcat.threads.current` 也贴近 max  
 4. **jstack 典型栈**（`evidence/jstack-*.txt`）：  
-   - 大量 `http-nio-*-exec-*` 处于 `TIMED_WAITING` / `WAITING`  
-   - 栈顶附近出现 `socketRead0` / `RestTemplate` / HTTP 客户端读  
-   - **RUNNABLE 很少** → 不是 CPU 热点死循环  
+   - 约 10 条 `http-nio-*-exec-*`，栈经 `RestTemplate` → `HttpURLConnection` → `NioSocketImpl` / `Net.poll`  
+   - 现代 JDK 上阻塞读 socket **常显示为 `RUNNABLE`（native poll）**，不要只按 `TIMED_WAITING` 过滤；关键是栈顶在等下游响应，且线程 busy≈max  
+   - 业务代码没有吃满 CPU 的热点循环  
 5. 可用演练同款统计：
 
 ```bash
 grep 'java.lang.Thread.State' evidence/jstack-*.txt | sort | uniq -c | sort -rn
-grep -E 'socketRead|RestTemplate|park' evidence/jstack-*.txt | head -50
+grep -E 'RestTemplate|NioSocketImpl|Net\.poll|HttpClient' evidence/jstack-*.txt | head -50
 ```
 
-可选：`GET /actuator/threaddump` 与 `jstack` 对照。
+可选：`GET http://localhost:8082/actuator/threaddump` 与 `jstack` 对照。
 
 ---
 

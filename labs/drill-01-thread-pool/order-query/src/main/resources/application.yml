@@ -1,13 +1,20 @@
 server:
   port: ${PORT:8080}
   tomcat:
+    # 暴露 tomcat.threads.* Micrometer 指标
+    mbeanregistry:
+      enabled: true
     threads:
       # 故意设小：配合慢下游，少量并发即可打满工作线程
       max: 10
       min-spare: 2
     accept-count: 100
 
+
 management:
+  # 独立管理端口：业务线程打满时仍可观察 metrics / threaddump
+  server:
+    port: ${MANAGEMENT_PORT:8082}
   endpoints:
     web:
       exposure:
@@ -15,6 +22,7 @@ management:
   endpoint:
     health:
       show-details: always
+
 
 inventory:
   base-url: ${INVENTORY_BASE_URL:http://localhost:8081}

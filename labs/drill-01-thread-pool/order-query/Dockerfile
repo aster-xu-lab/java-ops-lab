@@ -11,6 +11,7 @@ FROM eclipse-temurin:21-jdk-jammy
 WORKDIR /app
 COPY --from=build /src/target/order-query-1.0.0.jar /app/app.jar
 ENV PORT=8080 \
+    MANAGEMENT_PORT=8082 \
     INVENTORY_BASE_URL=http://inventory-mock:8081
-EXPOSE 8080
+EXPOSE 8080 8082
 CMD ["java", "-jar", "/app/app.jar"]

@@ -23,9 +23,9 @@ wait "${LOAD_PID}" || true
 echo
 echo "======== 复现完成：预期现象 ========"
 echo "1) CPU 不必很高，但 /api/order/detail 变慢（秒级）"
-echo "2) tomcat.threads.busy 接近 max(=10)"
-echo "3) jstack 中大量 http-nio-*-exec-* 处于 TIMED_WAITING/WAITING，栈含 socketRead / RestTemplate"
-echo "4) RUNNABLE 很少 → 阻塞型打满，不是算力热点"
+echo "2) ${MGMT_URL}/actuator/metrics/tomcat.threads.busy 接近 max(=10)"
+echo "3) jstack：约 10 条 http-nio-8080-exec-*，栈含 RestTemplate / NioSocketImpl / Net.poll"
+echo "4) 现代 JDK 上阻塞读常显示 RUNNABLE(native)，关键看栈与 busy，不是 CPU 热点循环"
 echo
 echo "证据目录: ${EVIDENCE_DIR}/"
 echo "清理: ${SCRIPT_DIR}/cleanup.sh"
