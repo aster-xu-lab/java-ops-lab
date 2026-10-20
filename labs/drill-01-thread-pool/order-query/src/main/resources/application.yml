@@ -1,0 +1,28 @@
+server:
+  port: ${PORT:8080}
+  tomcat:
+    threads:
+      # 故意设小：配合慢下游，少量并发即可打满工作线程
+      max: 10
+      min-spare: 2
+    accept-count: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,threaddump
+  endpoint:
+    health:
+      show-details: always
+
+inventory:
+  base-url: ${INVENTORY_BASE_URL:http://localhost:8081}
+  # 超时故意偏长：线程会被下游 sleep 拖住，而不是快速失败
+  connect-timeout: 2s
+  read-timeout: 10s
+
+logging:
+  level:
+    root: INFO
+    com.javaops.lab.order: INFO
