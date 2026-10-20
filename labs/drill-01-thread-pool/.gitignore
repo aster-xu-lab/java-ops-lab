@@ -1,7 +1,10 @@
 .run/
 **/target/
 evidence/jstack-*.txt
+evidence/tomcat-threads-busy.json
+evidence/tomcat-threads-current.json
 evidence/*.log
 .idea/
 *.iml
 .DS_Store
+
