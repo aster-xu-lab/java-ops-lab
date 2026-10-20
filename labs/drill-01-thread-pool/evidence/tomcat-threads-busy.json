@@ -1,1 +1,0 @@
-{"name":"tomcat.threads.busy","baseUnit":"threads","measurements":[{"statistic":"VALUE","value":10.0}],"availableTags":[{"tag":"name","values":["http-nio-8080"]}]}
